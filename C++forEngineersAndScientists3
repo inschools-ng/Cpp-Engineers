@@ -1,0 +1,126 @@
+//Exercise solved  from Chapter 14 C++ for Engineers and Scientists by Gary R Bronson
+
+#include "KinematicArrive.h"
+#include "KinematicWander.h"
+#include <stdlib.h>     /* srand, rand */
+#include <time.h>       /* time */
+#include "KinematicFlee.h"
+#include "KinematicSeek.h"
+
+KinematicArrive::KinematicArrive(float radius, float timeToTarget, float maxSpeed) 
+{
+	this->maxSpeed = maxSpeed;
+	this->timeToTarget = timeToTarget;
+	this->radius = radius;
+}
+
+KinematicArrive::KinematicArrive()
+{
+	radius = 50;
+	maxSpeed = 300;
+	timeToTarget = 7;
+}
+
+KinematicSteeringOutput KinematicArrive::getSteering()
+{
+	KinematicSteeringOutput steering;
+	//target direction 
+	steering.velocity = target.position.subtract(character.position);
+
+	// calculation of distance reached
+	if(steering.velocity.magnitude() < radius)
+	{
+		steering.rotation = 0.0;
+		steering.velocity = VectorOrPoint(0,0,0,0);
+		return steering;
+	}
+
+	//Target movement 
+	steering.velocity = steering.velocity.multiply(1/timeToTarget);
+
+	//Clipping to maximum speed 
+	if(steering.velocity.magnitude() > maxSpeed)
+	{
+		steering.velocity.normalize();
+		steering.velocity = steering.velocity.multiply(maxSpeed);
+	}
+
+	//positional direction 
+	character.orientation = character.getNewOrientation(character.orientation,steering.velocity);
+
+	//output steering 
+	steering.rotation = 0;
+
+	return steering;
+}
+
+KinematicWander::KinematicWander()
+{
+	srand(time(NULL));
+}
+
+KinematicSteeringOutput KinematicWander::getSteering()
+{
+	KinematicSteeringOutput steering;
+	//get direction to target
+	steering.velocity = character.getOrientationAsVector().multiply(maxSpeed);
+
+	//change our orientation randomly
+	steering.rotation = randomBinomial() * maxRotation;
+
+	return steering;
+}
+
+float KinematicWander::randomBinomial()
+{
+	//return number between -1 and 1
+	return ((float)rand() / (float)RAND_MAX) - ((float)rand() / (float)RAND_MAX);
+}
+
+KinematicFlee::KinematicFlee(float maxSpeed)
+{
+	this->maxSpeed = maxSpeed;
+}
+
+KinematicSteeringOutput KinematicFlee::getSteering()
+{
+	KinematicSteeringOutput steering;
+	//position away from target 
+	steering.velocity = character.position.subtract(target.position);
+
+	//position in the direction of velocity 
+	steering.velocity.normalize();
+	steering.velocity = steering.velocity.multiply(maxSpeed);
+
+	//position in the direction of target 
+	character.orientation = character.getNewOrientation(character.orientation, steering.velocity);
+
+	//output steering
+	steering.rotation = 0;
+
+	return steering;
+}
+
+KinematicSeek::KinematicSeek(float maxSpeed) 
+{
+	this->maxSpeed = maxSpeed;
+}
+
+KinematicSteeringOutput KinematicSeek::getSteering()
+{
+	KinematicSteeringOutput steering;
+	//positional direction 
+	steering.velocity = target.position.subtract(character.position);
+
+	//direction of velocity 
+	steering.velocity.normalize();
+	steering.velocity = steering.velocity.multiply(maxSpeed);
+
+	//positional direction 
+	character.orientation = character.getNewOrientation(character.orientation, steering.velocity);
+
+	//output steering
+	steering.rotation = 0;
+
+	return steering;
+}
