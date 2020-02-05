@@ -1,0 +1,202 @@
+//Exercise solved  from Chapter 14 C++ for Engineers and Scientists by Gary R Bronson
+
+#include "Pursue.h"
+#include "Flee.h"
+#include "Arrive.h"
+#include "Evade.h"
+#include "Seek.h"
+#include "Align.h"
+#include <math.h> //M_PI
+#include <cmath> //abs
+
+SteeringOutput Pursue::getSteering()
+{
+	//1. Calculate the target to delegate to Seek.getSteering()
+	//distance to target
+	float distance = tempTarget.position.subtract(character.position).magnitude();
+	//get speed
+	float speed = character.velocity.magnitude();
+
+	float prediction;
+	//check if speed is too small
+	if(speed < (distance/maxPrediction))
+	{
+		prediction = maxPrediction;
+	}
+	else
+	{
+		prediction = distance / speed;
+	}
+
+	//put target together
+	target = tempTarget;
+	target.position = target.position.add(target.velocity.multiply(prediction));
+
+	//2. delegate to Seek
+	return Seek::getSteering();
+}
+
+}
+
+SteeringOutput Flee::getSteering()
+{
+	SteeringOutput steering;
+
+	//get direction to target
+	steering.linear = character.position.subtract(target.position);
+
+	//give full acceleration along this direction
+	steering.linear.normalize();
+	steering.linear = steering.linear.multiply(maxAcceleration);
+
+	//output steering
+	steering.angular = 0;
+	return steering;
+}
+
+SteeringOutput Arrive::getSteering()
+{
+	SteeringOutput steering;
+	float targetSpeed = 0.0;
+
+	VectorOrPoint targetVelocity = target.position.subtract(character.position);
+	float distance = targetVelocity.magnitude();
+
+	//check if we are there, return no steering
+	if (distance < targetRadius)
+	{
+		steering.linear = VectorOrPoint(0, 0, 0, 0);
+		steering.angular = 0.0;
+		return steering;
+	}
+
+	//if we are outside of slowRadius, then go maxSpeed
+	if (distance > slowRadius)
+	{
+		targetSpeed = maxSpeed;
+	}
+	else
+	{
+		targetSpeed = maxSpeed * distance / slowRadius;
+	}
+
+	//the target velocity combines speed and direction
+	targetVelocity.normalize();
+	targetVelocity = targetVelocity.multiply(targetSpeed);
+
+	//acceleration tries to get to the target velocity
+	steering.linear = targetVelocity.subtract(character.velocity);
+	steering.linear = steering.linear.multiply(1 / timeToTarget);
+
+	//check if acceleration is too fast
+	if (steering.linear.magnitude() > maxAcceleration)
+	{
+		steering.linear.normalize();
+		steering.linear = steering.linear.multiply(maxAcceleration);
+	}
+
+	//output steering
+	steering.angular = 0.0;
+	return steering;
+}
+
+SteeringOutput Evade::getSteering()
+{
+	//1. Calculate the target to delegate to Seek.getSteering()
+	//distance to target
+	float distance = tempTarget.position.subtract(character.position).magnitude();
+	//get speed
+	float speed = character.velocity.magnitude();
+
+	float prediction;
+	//check if speed is too small
+	if (speed < (distance / maxPrediction))
+	{
+		prediction = maxPrediction;
+	}
+	else
+	{
+		prediction = distance / speed;
+	}
+
+	//put target together
+	target = tempTarget;
+	target.position = target.position.add(target.velocity.multiply(prediction));
+
+	//2. delegate to Seek
+	return Flee::getSteering();
+}
+
+SteeringOutput Seek::getSteering()
+{
+	SteeringOutput steering;
+
+	//get direction to target
+	steering.linear = target.position.subtract(character.position);
+
+	//give full acceleration along this direction
+	steering.linear.normalize();
+	steering.linear = steering.linear.multiply(maxAcceleration);
+
+	//output steering
+	steering.angular = 0;
+	return steering;
+}
+
+
+SteeringOutput Align::getSteering()
+{
+	SteeringOutput steering;
+
+	float rotation = target.orientation - character.orientation;
+	float rotationDirection = mapToRange(rotation);
+	float rotationSize = abs(rotationDirection);
+
+	//check if we are there, return no steering
+	if (rotationSize < targetRadius)
+	{
+		//		return NULL;
+	}
+
+	float targetRotation;
+
+	//if we are outside slowRadius, use maxRotation
+	if (rotationSize > slowRadius)
+	{
+		targetRotation = maxRotation;
+	}
+	else
+	{
+		targetRotation = maxRotation * rotationSize / slowRadius;
+	}
+
+	//the final target rotation combines speed and direction
+	targetRotation *= rotation / rotationSize;
+
+	//acceleration tries to get to target rotation
+	steering.angular = targetRotation - character.rotation;
+	steering.angular /= timeToTarget;
+
+	//check if acceleration is too great
+	float angularAcceleration = abs(steering.angular);
+	if (angularAcceleration > maxAngularAcceleration)
+	{
+		steering.angular /= angularAcceleration;
+		steering.angular *= maxAngularAcceleration;
+	}
+
+	//output steering
+	steering.linear = VectorOrPoint(0, 0, 0, 0);
+	return steering;
+}
+
+float Align::mapToRange(float rotation)
+{
+	//	rotation %= (float)M_PI;
+	if (rotation > M_PI)
+	{
+		rotation -= (2 * M_PI);
+	}
+
+	return rotation;
+}
